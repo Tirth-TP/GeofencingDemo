@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.os.Build
 import com.example.geofencingdemo.broadcast.GeofenceBroadcastReceiver
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofenceStatusCodes
@@ -17,8 +18,6 @@ class GeofenceHelper(base: Context) : ContextWrapper(base) {
     companion object {
         const val TAG = "GeofenceHelper"
     }
-
-    private var pendingIntent: PendingIntent? = null
 
     fun getGeofencingRequest(geofence: Geofence): GeofencingRequest {
         return GeofencingRequest.Builder()
@@ -42,18 +41,22 @@ class GeofenceHelper(base: Context) : ContextWrapper(base) {
             .build()
     }
 
-    fun getPendingIntent(): PendingIntent {
-        pendingIntent?.let { return it }
-
+    private val _pendingIntent: PendingIntent by lazy {
         val intent = Intent(this, GeofenceBroadcastReceiver::class.java)
-        pendingIntent =
-            PendingIntent.getBroadcast(
-                this,
-                2607,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-        return pendingIntent!!
+        PendingIntent.getBroadcast(
+            this,
+            2607,
+            intent,
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_CANCEL_CURRENT
+            } else {
+                PendingIntent.FLAG_MUTABLE
+            }
+        )
+    }
+
+    fun getPendingIntent(): PendingIntent {
+        return _pendingIntent
     }
 
     fun getErrorString(e: Exception): String {

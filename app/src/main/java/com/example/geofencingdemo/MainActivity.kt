@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
@@ -28,6 +29,7 @@ import com.google.android.gms.maps.model.CircleOptions
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -51,6 +53,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
+    private val requestNotificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (!isGranted) {
+                // Permission is denied, handle it accordingly
+                Toast.makeText(this, "Notification permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+
     @RequiresApi(Build.VERSION_CODES.Q)
     private val requestBackgroundLocationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -71,10 +81,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+        } else {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            )
+        }
 
         val apiKey = resources.getString(R.string.google_maps_key)
 
@@ -85,6 +107,23 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             supportFragmentManager.findFragmentById(R.id.map_view) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
+
+    }
+
+    private fun askForNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                // Permission is already granted, enable user location
+
+            } else {
+                // Permission not granted, request it
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
     }
 
@@ -103,7 +142,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         enableUserLocation()
 
         mGoogleMap?.setOnMapLongClickListener {
-
             latLndBackgroundPermission = it
             if (Build.VERSION.SDK_INT >= 29) {
                 //We need background permission
@@ -186,6 +224,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             // Permission is already granted, enable user location
             binding.mapOptionsMenu.visibility = View.INVISIBLE
             mGoogleMap?.isMyLocationEnabled = true
+
+            //Set Icon position
+            mGoogleMap?.setPadding(0, 90, 0, 0)
         } else {
             // Permission not granted, request it
             requestFineLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -200,6 +241,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             ) == PackageManager.PERMISSION_GRANTED
         ) {
             tryAddingGeofence(latLng)
+            //Notification permission after background permission
+            askForNotificationPermission()
         } else {
             requestBackgroundLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
