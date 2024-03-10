@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import android.widget.Toast
 import com.example.geofencingdemo.MainActivity
 import com.example.geofencingdemo.helper.NotificationHelper
 import com.google.android.gms.location.Geofence
@@ -39,12 +38,8 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
 
         val transitionType = geofencingEvent?.geofenceTransition
 
-        Log.e(TAG, "onReceive() --> HERE ON WHEN")
-        Log.e(TAG, "onReceive() --> Type $transitionType")
         when (transitionType) {
             Geofence.GEOFENCE_TRANSITION_ENTER -> {
-                Log.e(TAG, "onReceive() --> ENTER")
-                Toast.makeText(context, "GEOFENCE_TRANSITION_ENTER", Toast.LENGTH_SHORT).show()
                 notificationHelper.sendHighPriorityNotification(
                     "GEOFENCE_TRANSITION_ENTER",
                     "",
@@ -53,7 +48,6 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
             }
 
             Geofence.GEOFENCE_TRANSITION_DWELL -> {
-                Toast.makeText(context, "GEOFENCE_TRANSITION_DWELL", Toast.LENGTH_SHORT).show()
                 notificationHelper.sendHighPriorityNotification(
                     "GEOFENCE_TRANSITION_DWELL",
                     "",
@@ -62,7 +56,6 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
             }
 
             Geofence.GEOFENCE_TRANSITION_EXIT -> {
-                Toast.makeText(context, "GEOFENCE_TRANSITION_EXIT", Toast.LENGTH_SHORT).show()
                 notificationHelper.sendHighPriorityNotification(
                     "GEOFENCE_TRANSITION_EXIT",
                     "",

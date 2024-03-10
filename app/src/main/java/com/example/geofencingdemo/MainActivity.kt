@@ -3,8 +3,10 @@ package com.example.geofencingdemo
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Location
 import android.os.Build
 import android.os.Bundle
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -16,9 +18,14 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.geofencingdemo.databinding.ActivityMainBinding
 import com.example.geofencingdemo.helper.GeofenceHelper
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -26,15 +33,45 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.Circle
 import com.google.android.gms.maps.model.CircleOptions
+import com.google.android.gms.maps.model.Dot
+import com.google.android.gms.maps.model.Gap
+import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+import com.google.android.gms.maps.model.PatternItem
+import com.google.android.gms.maps.model.PolylineOptions
+import com.google.android.gms.maps.model.RoundCap
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
+import java.util.Timer
+import java.util.TimerTask
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
+    // Declare variables for location updates
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
+
+    // Firebase
+    private lateinit var database: FirebaseDatabase
+    private lateinit var locationRef: DatabaseReference
+
+    private val locationList = ArrayList<LatLng>()
+
+    private val TIMER_INTERVAL: Long = 2000 // 30 seconds
+    private var timer: Timer? = null
+
+    // Polyline pattern
+    private val dot: PatternItem = Dot()
+    private val gap: PatternItem = Gap(25f)
+    private val patternPolyDot = listOf(gap, dot)
+
     private lateinit var binding: ActivityMainBinding
-    private lateinit var autoCompleteFragment: AutocompleteSupportFragment
     private var circle: Circle? = null
 
     private lateinit var geofencingClient: GeofencingClient
@@ -77,7 +114,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1001
-        private const val BACKGROUND_LOCATION_ACCESS_REQUEST_CODE = 1002
     }
 
 
@@ -98,6 +134,21 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             )
         }
 
+        // Initialize Firebase
+        database = FirebaseDatabase.getInstance()
+        locationRef = database.getReference("user_locations")
+
+        // Initialize fused location client and location callback
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                super.onLocationResult(locationResult)
+                // Store the user's location in the database
+                storeLocation(locationResult.lastLocation)
+            }
+        }
+
+
         val apiKey = resources.getString(R.string.google_maps_key)
 
         geofencingClient = LocationServices.getGeofencingClient(this)
@@ -109,6 +160,94 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
     }
+
+    override fun onMapReady(googlwMap: GoogleMap) {
+        mGoogleMap = googlwMap
+
+        val location = LatLng(23.597969, 72.969818)
+
+        val cameraPosition = CameraPosition.Builder()
+            .target(location)
+            .zoom(14f) // Adjust the zoom level as needed
+            .build()
+
+        mGoogleMap?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+
+//        retrieveAndDrawPolyline()
+        startLocationUpdates()
+
+        enableUserLocation()
+
+        mGoogleMap?.setOnMapLongClickListener {
+            latLndBackgroundPermission = it
+            if (Build.VERSION.SDK_INT >= 29) {
+                //We need background permission
+                requestBackgroundPermission(it)
+            } else {
+                tryAddingGeofence(it)
+            }
+        }
+    }
+
+
+    private fun storeLocation(location: Location?) {
+        // Generate a unique key for the location data
+        val locationKey = locationRef.push().key
+        locationKey?.let {
+            val locationData = HashMap<String, Any>()
+            locationData["latitude"] = location!!.latitude
+            locationData["longitude"] = location.longitude
+            // You can add more data such as timestamp
+            locationData["timestamp"] = ServerValue.TIMESTAMP
+            // Set the location data in the database under a unique key
+            locationRef.child(locationKey).setValue(locationData)
+                .addOnSuccessListener {
+                    Log.d("TAG", "Location stored successfully")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("TAG", "Failed to store location: $e")
+                }
+        }
+    }
+
+    private fun requestLocationUpdates() {
+        /*    val locationRequest = LocationRequest.create().apply {
+                interval = 2000 // 30 seconds
+                fastestInterval = 2000 // 15 seconds
+                priority = Priority.PRIORITY_HIGH_ACCURACY
+            }*/
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
+            .setWaitForAccurateLocation(false)
+            .setMinUpdateIntervalMillis(2000)
+            .setMaxUpdateDelayMillis(2000)
+            .build()
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.requestLocationUpdates(
+                locationRequest,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Request location updates when the activity is resumed
+        requestLocationUpdates()
+        stopLocationUpdates()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Remove location updates when the activity is paused
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        stopLocationUpdates()
+    }
+
 
     private fun askForNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -125,31 +264,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
-    }
-
-    override fun onMapReady(googlwMap: GoogleMap) {
-        mGoogleMap = googlwMap
-
-        val location = LatLng(23.597969, 72.969818)
-
-        val cameraPosition = CameraPosition.Builder()
-            .target(location)
-            .zoom(14f) // Adjust the zoom level as needed
-            .build()
-
-        mGoogleMap?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
-
-        enableUserLocation()
-
-        mGoogleMap?.setOnMapLongClickListener {
-            latLndBackgroundPermission = it
-            if (Build.VERSION.SDK_INT >= 29) {
-                //We need background permission
-                requestBackgroundPermission(it)
-            } else {
-                tryAddingGeofence(it)
-            }
-        }
     }
 
     private fun tryAddingGeofence(latLng: LatLng) {
@@ -247,4 +361,66 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             requestBackgroundLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }
+
+    // Function to start fetching location data periodically
+    private fun startLocationUpdates() {
+        if (timer == null) {
+            timer = Timer()
+            timer?.scheduleAtFixedRate(object : TimerTask() {
+                override fun run() {
+                    Log.e("tag timer", "run() --> yinmrtr")
+                    retrieveAndDrawPolyline()
+                }
+            }, 0, TIMER_INTERVAL)
+        }
+    }
+
+    private fun retrieveAndDrawPolyline() {
+        locationList.clear()
+        // Retrieve data from Firebase
+        locationRef.addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(dataSnapshot: DataSnapshot) {
+                // Iterate through the dataSnapshot to retrieve location data
+                for (snapshot in dataSnapshot.children) {
+                    val latitude = snapshot.child("latitude").value as Double
+                    val longitude = snapshot.child("longitude").value as Double
+                    val latLng = LatLng(latitude, longitude)
+                    locationList.add(latLng)
+                }
+                // Draw polyline on the map using the retrieved location data
+                drawPolyline()
+            }
+
+            override fun onCancelled(databaseError: DatabaseError) {
+                Log.e("TAG", "Failed to read value.", databaseError.toException())
+            }
+        })
+    }
+
+    private fun drawPolyline() {
+        mGoogleMap?.clear()
+        Log.e("TAG", "drawPolyline: $locationList")
+        mGoogleMap?.let { map ->
+            if (locationList.isNotEmpty()) {
+                // Add the polyline to the map
+                map.addPolyline(
+                    PolylineOptions()
+                        .clickable(true)
+                        .addAll(locationList)
+                        .endCap(RoundCap())
+                        .jointType(JointType.ROUND)
+                        .width(12f)
+                        .pattern(patternPolyDot)
+                )
+            } else {
+                Log.e("TAG", "Location list is empty")
+            }
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        timer?.cancel()
+        timer = null
+    }
+
 }
