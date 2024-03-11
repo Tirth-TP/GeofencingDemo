@@ -18,6 +18,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.geofencingdemo.databinding.ActivityMainBinding
 import com.example.geofencingdemo.helper.GeofenceHelper
+import com.example.geofencingdemo.utils.UserUtils
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
@@ -49,9 +50,13 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import java.util.Timer
 import java.util.TimerTask
+import java.util.UUID
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+
+    //User Key For firebase
+    private lateinit var userKey: String
 
     // Declare variables for location updates
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -134,6 +139,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             )
         }
 
+        //Get Unique user key
+        userKey = UserUtils.getUserId()
+
         // Initialize Firebase
         database = FirebaseDatabase.getInstance()
         locationRef = database.getReference("user_locations")
@@ -144,7 +152,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
                 // Store the user's location in the database
-                storeLocation(locationResult.lastLocation)
+                storeLocation(locationResult.lastLocation, userKey)
             }
         }
 
@@ -190,9 +198,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-    private fun storeLocation(location: Location?) {
+    private fun storeLocation(location: Location?, userId: String) {
         // Generate a unique key for the location data
-        val locationKey = locationRef.push().key
+        val locationKey = locationRef.child(userId).push().key
         locationKey?.let {
             val locationData = HashMap<String, Any>()
             locationData["latitude"] = location!!.latitude
@@ -200,7 +208,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             // You can add more data such as timestamp
             locationData["timestamp"] = ServerValue.TIMESTAMP
             // Set the location data in the database under a unique key
-            locationRef.child(locationKey).setValue(locationData)
+            locationRef.child(userId).child(locationKey).setValue(locationData)
                 .addOnSuccessListener {
                     Log.d("TAG", "Location stored successfully")
                 }
@@ -368,17 +376,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             timer = Timer()
             timer?.scheduleAtFixedRate(object : TimerTask() {
                 override fun run() {
-                    Log.e("tag timer", "run() --> yinmrtr")
-                    retrieveAndDrawPolyline()
+                    retrieveAndDrawPolyline(userKey)
                 }
             }, 0, TIMER_INTERVAL)
         }
     }
 
-    private fun retrieveAndDrawPolyline() {
+    private fun retrieveAndDrawPolyline(userId: String) {
         locationList.clear()
         // Retrieve data from Firebase
-        locationRef.addListenerForSingleValueEvent(object : ValueEventListener {
+        locationRef.child(userId).addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(dataSnapshot: DataSnapshot) {
                 // Iterate through the dataSnapshot to retrieve location data
                 for (snapshot in dataSnapshot.children) {
@@ -398,7 +405,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun drawPolyline() {
-        mGoogleMap?.clear()
+        //mGoogleMap?.clear()
         Log.e("TAG", "drawPolyline: $locationList")
         mGoogleMap?.let { map ->
             if (locationList.isNotEmpty()) {
