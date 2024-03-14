@@ -50,7 +50,6 @@ import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
 import java.util.Timer
 import java.util.TimerTask
-import java.util.UUID
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -153,6 +152,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                 super.onLocationResult(locationResult)
                 // Store the user's location in the database
                 storeLocation(locationResult.lastLocation, userKey)
+                startLocationUpdates()
+                //drawPolyline()
             }
         }
 
@@ -172,17 +173,32 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onMapReady(googlwMap: GoogleMap) {
         mGoogleMap = googlwMap
 
-        val location = LatLng(23.597969, 72.969818)
 
-        val cameraPosition = CameraPosition.Builder()
-            .target(location)
-            .zoom(14f) // Adjust the zoom level as needed
-            .build()
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    location?.let {
+                        val locationC = LatLng(location.latitude, location.longitude)
+                        val cameraPosition = CameraPosition.Builder()
+                            .target(locationC)
+                            .zoom(14f)
+                            .build()
 
-        mGoogleMap?.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition))
+                        mGoogleMap?.animateCamera(
+                            CameraUpdateFactory.newCameraPosition(
+                                cameraPosition
+                            )
+                        )
 
-//        retrieveAndDrawPolyline()
-        startLocationUpdates()
+                    }
+                }
+        }
+
+        //startLocationUpdates()
 
         enableUserLocation()
 
@@ -331,9 +347,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             CircleOptions()
                 .center(center)
                 .radius(1000.0)
-                .strokeWidth(8f)
-                .strokeColor(Color.parseColor("#FF0000"))
-                .fillColor(ContextCompat.getColor(this, R.color.red))
+                .strokeWidth(2f)
+                .strokeColor(ContextCompat.getColor(this, R.color.blue_border))
+                .fillColor(ContextCompat.getColor(this, R.color.blue_fill))
         )
     }
 
@@ -409,6 +425,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         Log.e("TAG", "drawPolyline: $locationList")
         mGoogleMap?.let { map ->
             if (locationList.isNotEmpty()) {
+                Log.e("TAG", "drawPolyline: Drawing")
                 // Add the polyline to the map
                 map.addPolyline(
                     PolylineOptions()
