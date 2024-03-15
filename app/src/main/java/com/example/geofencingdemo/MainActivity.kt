@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
                     //startLocationUpdates()
                     //drawPolyline()
-                    Log.e(TAG, "onLocationResult: Called")
+                    //Log.e(TAG, "onLocationResult: Called")
 
                     //Start the foreground service
                     // Check if the foreground service hasn't been started yet

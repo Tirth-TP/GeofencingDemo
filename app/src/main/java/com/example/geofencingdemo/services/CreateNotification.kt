@@ -1,6 +1,8 @@
 package com.example.geofencingdemo.services
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -19,24 +21,26 @@ fun createNotification(
     activityName: Class<*>
 ): Notification {
 
-    val CHANNEL_NAME = "High priority channel"
-    val CHANNEL_ID = "com.example.notifications$CHANNEL_NAME"
+    val CHANNEL_ID = "ForegroundServiceChannel"
 
-    val intent = Intent(context, activityName)
-    val pendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        PendingIntent.getActivity(context, 267, intent, PendingIntent.FLAG_IMMUTABLE)
-    } else {
-        PendingIntent.getActivity(context, 267, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+    // Create a notification channel if necessary (required for Android Oreo and above)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channelName = "Foreground Service Channel"
+        val importance = NotificationManager.IMPORTANCE_DEFAULT
+        val channel = NotificationChannel(CHANNEL_ID, channelName, importance)
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
     }
 
+    // Create an intent for the activity to open when the notification is clicked
+    val intent = Intent(context, activityName)
+    val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+
+    // Build and return the notification
     return NotificationCompat.Builder(context, CHANNEL_ID)
-        .setSmallIcon(R.drawable.ic_launcher_background)
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
-        .setStyle(
-            NotificationCompat.BigTextStyle().setSummaryText("summary")
-                .setBigContentTitle(title).bigText(body)
-        )
+        .setContentTitle(title)
+        .setContentText(body)
+        .setSmallIcon(R.drawable.ic_launcher_foreground)
         .setContentIntent(pendingIntent)
-        .setAutoCancel(true)
         .build()
 }

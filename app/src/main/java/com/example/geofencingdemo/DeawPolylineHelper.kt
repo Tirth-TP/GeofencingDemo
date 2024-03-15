@@ -39,7 +39,8 @@ fun retrieveAndDrawPolyline(
                 val latLng = LatLng(latitude, longitude)
                 locationList.add(latLng)
             }
-            if (locationList.isNotEmpty()) {    //To prevent from ConcurrentModificationException
+            if (locationList.isNotEmpty()) {
+                //To prevent from ConcurrentModificationException
                 drawPolyline()  //Draw Polyline
             } else {
                 Log.e(MainActivity.TAG, "Location list is empty")
