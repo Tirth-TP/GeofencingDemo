@@ -7,7 +7,7 @@ import android.util.Log
 import androidx.work.Data
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
-import com.example.geofencingdemo.helper.GeofenceWorker
+import com.example.geofencingdemo.workers.GeofenceNotificationWorker
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingEvent
 
@@ -39,7 +39,7 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
                     .putInt("transitionType", transitionType)
                     .build()
 
-                val oneTimeWorkRequest = OneTimeWorkRequestBuilder<GeofenceWorker>()
+                val oneTimeWorkRequest = OneTimeWorkRequestBuilder<GeofenceNotificationWorker>()
                     .setInputData(inputData)
                     .build()
 

@@ -37,7 +37,7 @@ class NotificationHelper(base: Context) : ContextWrapper(base) {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun createChannels() {
+    fun createChannels() {
         val notificationChannel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,

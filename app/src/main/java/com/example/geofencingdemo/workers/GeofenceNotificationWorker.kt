@@ -1,20 +1,21 @@
-package com.example.geofencingdemo.helper
+package com.example.geofencingdemo.workers
 
 import android.content.Context
 import android.util.Log
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.example.geofencingdemo.MainActivity
+import com.example.geofencingdemo.helper.NotificationHelper
 import com.google.android.gms.location.Geofence
 
 /**
  * Created by Tirth Patel.
  */
-class GeofenceWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
+class GeofenceNotificationWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
 
         Log.d("TAG", "Do Work")
-        val transitionType = inputData.getInt("transitionType", Geofence.GEOFENCE_TRANSITION_ENTER)
+        val transitionType = inputData.getInt("transitionType", -1)
 
         val notificationHelper = NotificationHelper(applicationContext)
         val title: String

@@ -1,6 +1,8 @@
 package com.example.geofencingdemo
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.location.Location
@@ -16,9 +18,18 @@ import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.work.Constraints
+import androidx.work.Data
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.example.geofencingdemo.databinding.ActivityMainBinding
 import com.example.geofencingdemo.helper.GeofenceHelper
+import com.example.geofencingdemo.services.LocationForegroundService
 import com.example.geofencingdemo.utils.UserUtils
+import com.example.geofencingdemo.workers.LocationUpdateWorker
+import com.example.geofencingdemo.workers.PolylineWorker
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Geofence
 import com.google.android.gms.location.GeofencingClient
@@ -34,22 +45,14 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.Circle
 import com.google.android.gms.maps.model.CircleOptions
-import com.google.android.gms.maps.model.Dot
-import com.google.android.gms.maps.model.Gap
-import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.android.gms.maps.model.PatternItem
-import com.google.android.gms.maps.model.PolylineOptions
-import com.google.android.gms.maps.model.RoundCap
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
-import com.google.firebase.database.ValueEventListener
 import java.util.Timer
 import java.util.TimerTask
+import java.util.concurrent.TimeUnit
 
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -65,15 +68,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var database: FirebaseDatabase
     private lateinit var locationRef: DatabaseReference
 
-    private val locationList = ArrayList<LatLng>()
-
     private val TIMER_INTERVAL: Long = 1000 // 1 seconds
     private var timer: Timer? = null
 
-    // Polyline pattern
-    private val dot: PatternItem = Dot()
-    private val gap: PatternItem = Gap(25f)
-    private val patternPolyDot = listOf(gap, dot)
 
     private lateinit var binding: ActivityMainBinding
     private var circle: Circle? = null
@@ -84,6 +81,8 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var latLndBackgroundPermission: LatLng
 
     private var previousLocationTime: Long = 0
+
+    private var foregroundServiceStarted = false
 
 
     private val requestFineLocationPermissionLauncher =
@@ -116,11 +115,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
 
-    private var mGoogleMap: GoogleMap? = null
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1001
-        private const val TAG = "TAG"
+        const val TAG = "TAG"
+
+        lateinit var mGoogleMap: GoogleMap
     }
 
 
@@ -164,13 +164,31 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
                     // Move the map's camera to the user's location
                     val currentLatLng = LatLng(location.latitude, location.longitude)
-                    mGoogleMap?.moveCamera(CameraUpdateFactory.newLatLng(currentLatLng))
+                    mGoogleMap.moveCamera(CameraUpdateFactory.newLatLng(currentLatLng))
 
                     // Store the user's location in the database
                     storeLocation(location, userKey)
 
-                    startLocationUpdates()
+                    //startLocationUpdates()
                     //drawPolyline()
+                    Log.e(TAG, "onLocationResult: Called")
+
+                    //Start the foreground service
+                    // Check if the foreground service hasn't been started yet
+                    if (!foregroundServiceStarted) {
+                        // Start the foreground service
+                        startForegroundService(
+                            Intent(
+                                applicationContext,
+                                LocationForegroundService::class.java
+                            )
+                        )
+                        // Set the flag to indicate that the service has been started
+                        foregroundServiceStarted = true
+                    }
+
+                    enqueuePolylineWorker(this@MainActivity)
+                    enqueueLocationUpdateWorker()
                 } else {
                     Log.e(TAG, "onLocationResult: Location is not available")
                 }
@@ -208,7 +226,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                             .zoom(14f)
                             .build()
 
-                        mGoogleMap?.animateCamera(
+                        mGoogleMap.animateCamera(
                             CameraUpdateFactory.newCameraPosition(
                                 cameraPosition
                             )
@@ -222,7 +240,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         enableUserLocation()
 
-        mGoogleMap?.setOnMapLongClickListener {
+        mGoogleMap.setOnMapLongClickListener {
             latLndBackgroundPermission = it
             if (Build.VERSION.SDK_INT >= 29) {
                 //We need background permission
@@ -321,7 +339,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun tryAddingGeofence(latLng: LatLng) {
-        mGoogleMap?.clear()
+        mGoogleMap.clear()
         addCircle(latLng)
         addMarker(latLng)
         addGeofence(latLng, 1000.0f)
@@ -364,7 +382,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun addMarker(position: LatLng) {
-        mGoogleMap?.addMarker(
+        mGoogleMap.addMarker(
             MarkerOptions()
                 .position(position)
                 .draggable(true)
@@ -373,7 +391,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private fun addCircle(center: LatLng) {
         circle?.remove()
-        circle = mGoogleMap?.addCircle(
+        circle = mGoogleMap.addCircle(
             CircleOptions()
                 .center(center)
                 .radius(1000.0)
@@ -391,10 +409,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         ) {
             // Permission is already granted, enable user location
             binding.mapOptionsMenu.visibility = View.INVISIBLE
-            mGoogleMap?.isMyLocationEnabled = true
+            mGoogleMap.isMyLocationEnabled = true
 
             //Set Icon position
-            mGoogleMap?.setPadding(0, 90, 0, 0)
+            mGoogleMap.setPadding(0, 90, 0, 0)
         } else {
             // Permission not granted, request it
             requestFineLocationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -422,54 +440,90 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             timer = Timer()
             timer?.scheduleAtFixedRate(object : TimerTask() {
                 override fun run() {
-                    retrieveAndDrawPolyline(userKey)
+                    //retrieveAndDrawPolyline(userKey)
                 }
             }, 0, TIMER_INTERVAL)
         }
     }
 
-    private fun retrieveAndDrawPolyline(userId: String) {
-        locationList.clear()
-        // Retrieve data from Firebase
-        locationRef.child(userId).addListenerForSingleValueEvent(object : ValueEventListener {
-            override fun onDataChange(dataSnapshot: DataSnapshot) {
-                // Iterate through the dataSnapshot to retrieve location data
-                for (snapshot in dataSnapshot.children) {
-                    val latitude = snapshot.child("latitude").value as Double
-                    val longitude = snapshot.child("longitude").value as Double
-                    val latLng = LatLng(latitude, longitude)
-                    locationList.add(latLng)
+    /*    private fun retrieveAndDrawPolyline(userId: String) {
+            locationList.clear()
+            // Retrieve data from Firebase
+            locationRef.child(userId).addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(dataSnapshot: DataSnapshot) {
+                    // Iterate through the dataSnapshot to retrieve location data
+                    for (snapshot in dataSnapshot.children) {
+                        val latitude = snapshot.child("latitude").value as Double
+                        val longitude = snapshot.child("longitude").value as Double
+                        val latLng = LatLng(latitude, longitude)
+                        locationList.add(latLng)
+                    }
+                    // Draw polyline on the map using the retrieved location data
+                    if (locationList.isNotEmpty()) {    //To prevent from ConcurrentModificationException
+                        drawPolyline(mGoogleMap, locationList)
+                    } else {
+                        Log.e(TAG, "Location list is empty")
+                    }
                 }
-                // Draw polyline on the map using the retrieved location data
-                drawPolyline()
-            }
 
-            override fun onCancelled(databaseError: DatabaseError) {
-                Log.e(TAG, "Failed to read value.", databaseError.toException())
-            }
-        })
+                override fun onCancelled(databaseError: DatabaseError) {
+                    Log.e(TAG, "Failed to read value.", databaseError.toException())
+                }
+            })
+        }*/
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun enqueuePolylineWorker(context: Context) {
+        val workManager = WorkManager.getInstance(context)
+
+        // Build input data containing the user ID
+        val inputData = Data.Builder()
+            .putString("userId", userKey)
+            .build()
+
+        // Define constraints if needed
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // Create a periodic request for the location update worker
+        val request = OneTimeWorkRequestBuilder<PolylineWorker>()
+            .setConstraints(constraints)
+            .setInputData(inputData)
+            .build()
+
+        // Enqueue the worker with WorkManager
+        workManager.enqueue(request)
+
     }
 
-    private fun drawPolyline() {
-        //mGoogleMap?.clear()
-        Log.e(TAG, "drawPolyline: $locationList")
-        mGoogleMap?.let { map ->
-            if (locationList.isNotEmpty()) {
-                Log.e(TAG, "drawPolyline: Drawing")
-                // Add the polyline to the map
-                map.addPolyline(
-                    PolylineOptions()
-                        .clickable(true)
-                        .addAll(locationList)
-                        .endCap(RoundCap())
-                        .jointType(JointType.ROUND)
-                        .width(12f)
-                        .pattern(patternPolyDot)
-                )
-            } else {
-                Log.e(TAG, "Location list is empty")
-            }
-        }
+    private fun enqueueLocationUpdateWorker() {
+        val workManager = WorkManager.getInstance(applicationContext)
+
+        // Build input data containing the user ID
+        val inputData = Data.Builder()
+            .putString("userId", userKey)
+            .build()
+
+        // Define constraints if needed
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        // Define how often the worker should run
+        val repeatInterval = 1000L // Repeat every 1000 milliseconds (1 second)
+
+        // Create a periodic request for the location update worker
+        val request = PeriodicWorkRequestBuilder<LocationUpdateWorker>(
+            repeatInterval, // Repeat interval
+            TimeUnit.MILLISECONDS // Time unit
+        )
+            .setConstraints(constraints) // Apply constraints
+            .setInputData(inputData) // Provide input data
+            .build()
+
+        // Enqueue the worker with WorkManager
+        workManager.enqueue(request)
     }
 
     private fun stopLocationUpdates() {
