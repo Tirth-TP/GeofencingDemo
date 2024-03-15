@@ -67,7 +67,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private val locationList = ArrayList<LatLng>()
 
-    private val TIMER_INTERVAL: Long = 2000 // 30 seconds
+    private val TIMER_INTERVAL: Long = 1000 // 1 seconds
     private var timer: Timer? = null
 
     // Polyline pattern
@@ -80,8 +80,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var geofencingClient: GeofencingClient
     private lateinit var geofenceHelper: GeofenceHelper
-    val GEOFENCE_ID = "my_geofence_1"
-    lateinit var latLndBackgroundPermission: LatLng
+    private val GEOFENCE_ID = "my_geofence_1"
+    private lateinit var latLndBackgroundPermission: LatLng
+
+    private var previousLocationTime: Long = 0
 
 
     private val requestFineLocationPermissionLauncher =
@@ -118,6 +120,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     companion object {
         private const val PERMISSION_REQUEST_CODE = 1001
+        private const val TAG = "TAG"
     }
 
 
@@ -138,6 +141,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             )
         }
 
+        // For turn on screen while app is running
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+
         //Get Unique user key
         userKey = UserUtils.getUserId()
 
@@ -150,15 +157,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
-                // Store the user's location in the database
-                storeLocation(locationResult.lastLocation, userKey)
-                startLocationUpdates()
-                //drawPolyline()
+
+                // Get the latest user location
+                val location = locationResult.lastLocation
+                if (location != null) {
+
+                    // Move the map's camera to the user's location
+                    val currentLatLng = LatLng(location.latitude, location.longitude)
+                    mGoogleMap?.moveCamera(CameraUpdateFactory.newLatLng(currentLatLng))
+
+                    // Store the user's location in the database
+                    storeLocation(location, userKey)
+
+                    startLocationUpdates()
+                    //drawPolyline()
+                } else {
+                    Log.e(TAG, "onLocationResult: Location is not available")
+                }
             }
         }
 
 
-        val apiKey = resources.getString(R.string.google_maps_key)
+        //val apiKey = resources.getString(R.string.google_maps_key)
 
         geofencingClient = LocationServices.getGeofencingClient(this)
         geofenceHelper = GeofenceHelper(this)
@@ -215,6 +235,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
     private fun storeLocation(location: Location?, userId: String) {
+        // Calculate the time difference
+        val currentTime = System.currentTimeMillis()
+        val timeDifference =
+            if (previousLocationTime.toInt() != 0) currentTime - previousLocationTime else 0
+
+        previousLocationTime = currentTime
+
+        Log.d(
+            TAG,
+            "Time difference since last location update: $timeDifference milliseconds"
+        )
         // Generate a unique key for the location data
         val locationKey = locationRef.child(userId).push().key
         locationKey?.let {
@@ -226,24 +257,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             // Set the location data in the database under a unique key
             locationRef.child(userId).child(locationKey).setValue(locationData)
                 .addOnSuccessListener {
-                    Log.d("TAG", "Location stored successfully")
+                    Log.d(TAG, "Location stored successfully")
                 }
                 .addOnFailureListener { e ->
-                    Log.e("TAG", "Failed to store location: $e")
+                    Log.e(TAG, "Failed to store location: $e")
                 }
         }
     }
 
     private fun requestLocationUpdates() {
-        /*    val locationRequest = LocationRequest.create().apply {
-                interval = 2000 // 30 seconds
-                fastestInterval = 2000 // 15 seconds
-                priority = Priority.PRIORITY_HIGH_ACCURACY
-            }*/
+
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2000)
             .setWaitForAccurateLocation(false)
-            .setMinUpdateIntervalMillis(2000)
-            .setMaxUpdateDelayMillis(2000)
+            .setMinUpdateIntervalMillis(1000)
+            .setMaxUpdateDelayMillis(1000)
             .build()
         if (ActivityCompat.checkSelfPermission(
                 this,
@@ -270,6 +297,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         // Remove location updates when the activity is paused
         fusedLocationClient.removeLocationUpdates(locationCallback)
         stopLocationUpdates()
+
+        //Clear screen on flag
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
 
@@ -415,17 +445,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             }
 
             override fun onCancelled(databaseError: DatabaseError) {
-                Log.e("TAG", "Failed to read value.", databaseError.toException())
+                Log.e(TAG, "Failed to read value.", databaseError.toException())
             }
         })
     }
 
     private fun drawPolyline() {
         //mGoogleMap?.clear()
-        Log.e("TAG", "drawPolyline: $locationList")
+        Log.e(TAG, "drawPolyline: $locationList")
         mGoogleMap?.let { map ->
             if (locationList.isNotEmpty()) {
-                Log.e("TAG", "drawPolyline: Drawing")
+                Log.e(TAG, "drawPolyline: Drawing")
                 // Add the polyline to the map
                 map.addPolyline(
                     PolylineOptions()
@@ -437,7 +467,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                         .pattern(patternPolyDot)
                 )
             } else {
-                Log.e("TAG", "Location list is empty")
+                Log.e(TAG, "Location list is empty")
             }
         }
     }

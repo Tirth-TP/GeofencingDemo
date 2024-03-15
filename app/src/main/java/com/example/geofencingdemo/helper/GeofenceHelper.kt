@@ -42,7 +42,8 @@ class GeofenceHelper(base: Context) : ContextWrapper(base) {
     }
 
     private val _pendingIntent: PendingIntent by lazy {
-        val intent = Intent(this, GeofenceBroadcastReceiver::class.java)
+        val intent = Intent("com.example.geofencingdemo.ACTION_GEOFENCE_EVENT")
+        intent.setClass(this, GeofenceBroadcastReceiver::class.java)
         PendingIntent.getBroadcast(
             this,
             2607,
