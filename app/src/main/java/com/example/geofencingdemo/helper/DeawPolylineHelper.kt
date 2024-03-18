@@ -1,6 +1,7 @@
-package com.example.geofencingdemo
+package com.example.geofencingdemo.helper
 
 import android.util.Log
+import com.example.geofencingdemo.MainActivity
 import com.google.android.gms.maps.model.Dot
 import com.google.android.gms.maps.model.Gap
 import com.google.android.gms.maps.model.JointType
@@ -27,6 +28,7 @@ private val locationList = ArrayList<LatLng>()
 fun retrieveAndDrawPolyline(
     userId: String?
 ) {
+    Log.e("Constant Tag", "retrieveAndDrawPolyline() - > called")
     locationList.clear()
     // Retrieve data from Firebase
     val locationRef =
@@ -57,7 +59,7 @@ fun retrieveAndDrawPolyline(
 fun drawPolyline() {
     MainActivity.mGoogleMap.let { map ->
         if (locationList.isNotEmpty()) {
-            Log.e(MainActivity.TAG, "drawPolyline: Drawing")
+            Log.e(MainActivity.TAG, "drawPolyline: Drawing $locationList")
             // Add the polyline to the map
             map.addPolyline(
                 PolylineOptions()

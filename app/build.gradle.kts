@@ -79,4 +79,6 @@ dependencies {
     implementation("com.google.android.libraries.places:places:3.3.0")
     //Google Location (Provide Geofencing)
     implementation("com.google.android.gms:play-services-location:21.2.0")
+
+    implementation("org.greenrobot:eventbus:3.3.1")
 }

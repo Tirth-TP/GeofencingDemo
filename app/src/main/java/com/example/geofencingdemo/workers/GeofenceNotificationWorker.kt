@@ -14,7 +14,6 @@ import com.google.android.gms.location.Geofence
 class GeofenceNotificationWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
 
-        Log.d("TAG", "Do Work")
         val transitionType = inputData.getInt("transitionType", -1)
 
         val notificationHelper = NotificationHelper(applicationContext)
