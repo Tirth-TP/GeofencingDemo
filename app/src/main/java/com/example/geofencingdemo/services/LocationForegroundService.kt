@@ -61,7 +61,7 @@ class LocationForegroundService : Service() {
                     onNewLocation(location)
                     storeLocation(location, locationRef)
 
-                    retrieveAndDrawPolyline(MainActivity.userKey)
+                    //retrieveAndDrawPolyline(MainActivity.userKey)
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

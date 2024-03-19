@@ -42,6 +42,7 @@ fun retrieveAndDrawPolyline(
                 locationList.add(latLng)
             }
             if (locationList.isNotEmpty()) {
+                Log.e("TAG-CHANGE", "onDataChange: $locationList")
                 //To prevent from ConcurrentModificationException
                 drawPolyline()  //Draw Polyline
             } else {

@@ -1,6 +1,8 @@
 package com.example.geofencingdemo
 
 import android.Manifest
+import android.app.ActivityManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -17,6 +19,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.geofencingdemo.databinding.ActivityMainBinding
 import com.example.geofencingdemo.helper.GeofenceHelper
+import com.example.geofencingdemo.helper.retrieveAndDrawPolyline
 import com.example.geofencingdemo.model.LocationEvent
 import com.example.geofencingdemo.services.LocationForegroundService
 import com.example.geofencingdemo.utils.GeofenceManager
@@ -31,15 +34,8 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.Circle
 import com.google.android.gms.maps.model.CircleOptions
-import com.google.android.gms.maps.model.Dot
-import com.google.android.gms.maps.model.Gap
-import com.google.android.gms.maps.model.JointType
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.android.gms.maps.model.PatternItem
-import com.google.android.gms.maps.model.Polyline
-import com.google.android.gms.maps.model.PolylineOptions
-import com.google.android.gms.maps.model.RoundCap
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 
@@ -48,9 +44,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var binding: ActivityMainBinding
     private var circle: Circle? = null
-    private var polyline: Polyline? = null
-
-    private var previousLocation: LatLng? = null
 
     private lateinit var geofencingClient: GeofencingClient
     private lateinit var geofenceHelper: GeofenceHelper
@@ -153,16 +146,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 tryAddingGeofence(it)
             }
-            /*    geofenceManager.addGeofence(
-                    GEOFENCE_ID,
-                    location!!.latLng,
-                    1000F,
-                )*/
         }
     }
 
     private fun setupManagers() {
         geofenceManager = GeofenceManager(this)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
+        val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+            if (serviceClass.name == service.service.className) {
+                return true
+            }
+        }
+        return false
     }
 
     // Method to update the map with location
@@ -179,34 +178,12 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     cameraPosition
                 )
             )
-            // Draw polyline only if there's a previous location
-         /*   if (previousLocation != null) {
-                drawPolylineC(previousLocation!!, locationC)
-            }
-            previousLocation = locationC*/
-
         }
-    }
-
-    private fun drawPolylineC(startLocation: LatLng, endLocation: LatLng) {
-        val dot: PatternItem = Dot()
-        val gap: PatternItem = Gap(25f)
-        val patternPolyDot = listOf(gap, dot)
-
-        mGoogleMap.addPolyline(
-            PolylineOptions()
-                .clickable(true)
-                .add(startLocation, endLocation)
-                .endCap(RoundCap())
-                .jointType(JointType.ROUND)
-                .width(12f)
-                .pattern(patternPolyDot)
-        )
     }
 
     override fun onStart() {
         super.onStart()
-        if (ContextCompat.checkSelfPermission(
+        if (!isServiceRunning(LocationForegroundService::class.java) && ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_BACKGROUND_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
@@ -253,14 +230,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         mGoogleMap.clear()
         addCircle(latLng)
         addMarker(latLng)
-        addGeofence(latLng, 1000.0f)
+        addGeofence(latLng)
     }
 
-    private fun addGeofence(latLng: LatLng, radius: Float) {
+    private fun addGeofence(latLng: LatLng) {
         val geofence = geofenceHelper.getGeofencing(
             GEOFENCE_ID,
             latLng,
-            radius,
+            1000.0f,
             Geofence.GEOFENCE_TRANSITION_ENTER or
                     Geofence.GEOFENCE_TRANSITION_DWELL or
                     Geofence.GEOFENCE_TRANSITION_EXIT
@@ -351,5 +328,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         location = locationEvent
         // Update the map with location
         updateMapWithLocation()
+        retrieveAndDrawPolyline(userKey)
     }
 }
