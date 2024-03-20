@@ -1,6 +1,7 @@
 package com.example.geofencingdemo
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
@@ -52,7 +53,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     private lateinit var geofenceHelper: GeofenceHelper
     private val GEOFENCE_ID = "my_geofence_1"
     private lateinit var latLndBackgroundPermission: LatLng
-    private var location: LocationEvent? = null
+    private var locationEventCall: LocationEvent? = null
 
     private lateinit var geofenceManager: GeofenceManager
 
@@ -149,7 +150,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
             binding.fbResume.visibility = View.VISIBLE
         }
         binding.fbResume.setOnClickListener {
-            binding.fbResume.visibility = View.GONE
+            binding.fbResume.visibility = View.VISIBLE
             isMapTouched = false
         }
         mGoogleMap.setOnMapLongClickListener {
@@ -168,6 +169,10 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         if (p0 == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
             isMapTouched = true
             binding.fbResume.visibility = View.VISIBLE
+
+            binding.fbResume.setIconResource(R.drawable.ic_navigation)
+            binding.fbResume.text = null
+            binding.fbResume.shrink()
         }
     }
 
@@ -187,9 +192,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     }
 
     // Method to update the map with location
+    @SuppressLint("SetTextI18n")
     private fun updateMapWithLocation() {
         if (!isMapTouched) {
-            location?.latLng?.let {
+            binding.fbResume.icon = null
+            binding.fbResume.text = locationEventCall?.speed.toString() + " km/h"
+
+            binding.fbResume.extend()
+
+            locationEventCall?.latLng?.let {
                 val locationC = LatLng(it.latitude, it.longitude)
                 val cameraPosition = CameraPosition.Builder()
                     .target(locationC)
@@ -349,7 +360,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     // Subscribe to location updates
     @Subscribe
     fun receiveLocationEvent(locationEvent: LocationEvent) {
-        location = locationEvent
+        locationEventCall = locationEvent
         // Update the map with location
         updateMapWithLocation()
         retrieveAndDrawPolyline(userKey)

@@ -48,15 +48,20 @@
         <!--           android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"-->
     </androidx.cardview.widget.CardView>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fb_resume"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginEnd="30dp"
         android:layout_marginBottom="50dp"
+        android:backgroundTint="@color/white"
         android:contentDescription="@string/Resume"
-        android:src="@drawable/ic_navigation"
-        android:visibility="gone"
+        android:minWidth="56dp"
+        android:textColor="@color/black"
+        app:iconTint="@color/black"
+        android:visibility="visible"
+        app:iconSize="38dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintRight_toRightOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -2,6 +2,6 @@
     <string name="app_name">GeofencingDemo</string>
     <string name="image_menu">ImageMenu</string>
     <string name="Resume">Resume</string>
-
+    <string name="speed">%d km/h</string>
 
 </resources>

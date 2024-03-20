@@ -6,6 +6,7 @@ import android.app.Service
 import android.content.Intent
 import android.location.Location
 import android.os.IBinder
+import android.util.Log
 import com.example.geofencingdemo.MainActivity
 import com.example.geofencingdemo.helper.storeLocation
 import com.example.geofencingdemo.model.LocationEvent
@@ -29,6 +30,8 @@ class LocationForegroundService : Service() {
     private var fusedLocationClient: FusedLocationProviderClient? = null
     private var locationCallback: LocationCallback? = null
     private var locationRequest: LocationRequest? = null
+
+    var isMoving = false
 
     // Firebase
     private lateinit var database: FirebaseDatabase
@@ -54,7 +57,21 @@ class LocationForegroundService : Service() {
                 try {
                     location = locationResult.lastLocation!!
 
-                    onNewLocation(location)
+                    // Calculate speed
+                    val speedInMetersPerSecond = location.speed // Speed in m/s
+                    Log.e("TAG-speed", "onLocationResult: $speedInMetersPerSecond" )
+
+                    if (speedInMetersPerSecond > 0) {
+                        isMoving = true
+                    } else {
+                        isMoving = false
+                        onNewLocation(location, 0)
+                        return
+                    }
+                    val speedInKilometersPerHour =
+                        speedInMetersPerSecond * 3.6 // Convert m/s to km/h
+
+                    onNewLocation(location, speedInKilometersPerHour.toInt())
                     storeLocation(location, locationRef)
 
                     //retrieveAndDrawPolyline(MainActivity.userKey)
@@ -70,10 +87,11 @@ class LocationForegroundService : Service() {
         }
     }
 
-    private fun onNewLocation(latLng: Location) {
+    private fun onNewLocation(latLng: Location, speed: Int) {
         EventBus.getDefault().post(
             LocationEvent(
-                latLng = LatLng(latLng.latitude, latLng.longitude)
+                latLng = LatLng(latLng.latitude, latLng.longitude),
+                speed = speed
             )
         )
         startForeground(NOTIFICATION_ID, getNotification())
