@@ -23,56 +23,59 @@ private val dot: PatternItem = Dot()
 private val gap: PatternItem = Gap(25f)
 
 private val patternPolyDot = listOf(gap, dot)
-private val locationList = ArrayList<LatLng>()
+
+private var previousLocation: LatLng? = null
+private var isPreviousLocationAvailable: Boolean = false
 
 fun retrieveAndDrawPolyline(
     userId: String?
 ) {
     Log.e("Constant Tag", "retrieveAndDrawPolyline() - > called")
-    locationList.clear()
+    //locationList.clear()
     // Retrieve data from Firebase
     val locationRef =
         FirebaseDatabase.getInstance().getReference("user_locations").child(userId!!)
-    locationRef.addListenerForSingleValueEvent(object : ValueEventListener {
+    locationRef.limitToLast(1).addListenerForSingleValueEvent(object : ValueEventListener {
         override fun onDataChange(dataSnapshot: DataSnapshot) {
-            for (snapshot in dataSnapshot.children) {
-                val latitude = snapshot.child("latitude").value as Double
-                val longitude = snapshot.child("longitude").value as Double
+            if (dataSnapshot.exists()) {
+                // Retrieve the latest location data
+                val latestLocation = dataSnapshot.children.first()
+                val latitude = latestLocation.child("latitude").value as Double
+                val longitude = latestLocation.child("longitude").value as Double
                 val latLng = LatLng(latitude, longitude)
-                locationList.add(latLng)
-            }
-            if (locationList.isNotEmpty()) {
-                Log.e("TAG-CHANGE", "onDataChange: $locationList")
-                //To prevent from ConcurrentModificationException
-                drawPolyline()  //Draw Polyline
+
+                if (!isPreviousLocationAvailable) {
+                    previousLocation = latLng
+                    isPreviousLocationAvailable = true
+                }
+
+                drawPolyline(latLng)
+
             } else {
-                Log.e(MainActivity.TAG, "Location list is empty")
+                Log.e(MainActivity.TAG, "No location data found")
             }
         }
 
         override fun onCancelled(error: DatabaseError) {
             Log.e(MainActivity.TAG, "Failed to read value.", error.toException())
         }
-
     })
 }
 
-fun drawPolyline() {
+fun drawPolyline(latLng: LatLng) {
     MainActivity.mGoogleMap.let { map ->
-        if (locationList.isNotEmpty()) {
-            Log.e(MainActivity.TAG, "drawPolyline: Drawing $locationList")
-            // Add the polyline to the map
-            map.addPolyline(
-                PolylineOptions()
-                    .clickable(true)
-                    .addAll(locationList)
-                    .endCap(RoundCap())
-                    .jointType(JointType.ROUND)
-                    .width(12f)
-                    .pattern(patternPolyDot)
-            )
-        } else {
-            Log.e(MainActivity.TAG, "Location list is empty")
-        }
+        Log.e(MainActivity.TAG, "drawPolyline: Drawing $latLng")
+        // Add the polyline to the map
+        map.addPolyline(
+            PolylineOptions()
+                .clickable(true)
+                .add(previousLocation, latLng)
+                .endCap(RoundCap())
+                .jointType(JointType.ROUND)
+                .width(12f)
+                .pattern(patternPolyDot)
+        )
     }
+    // Update the previous location to the current location
+    previousLocation = latLng
 }

@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             val locationC = LatLng(it.latitude, it.longitude)
             val cameraPosition = CameraPosition.Builder()
                 .target(locationC)
-                .zoom(14f)
+                .zoom(16f)
                 .build()
 
             mGoogleMap.animateCamera(
