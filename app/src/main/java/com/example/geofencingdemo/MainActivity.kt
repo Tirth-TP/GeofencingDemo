@@ -40,10 +40,13 @@ import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 
 
-class MainActivity : AppCompatActivity(), OnMapReadyCallback {
+class MainActivity : AppCompatActivity(), OnMapReadyCallback,
+    GoogleMap.OnCameraMoveStartedListener {
 
     private lateinit var binding: ActivityMainBinding
     private var circle: Circle? = null
+
+    private var isMapTouched = false
 
     private lateinit var geofencingClient: GeofencingClient
     private lateinit var geofenceHelper: GeofenceHelper
@@ -138,6 +141,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
         enableUserLocation()
 
+        //When user change camera position
+        mGoogleMap.setOnCameraMoveStartedListener(this)
+
+        mGoogleMap.setOnMapClickListener {
+            isMapTouched = true
+            binding.fbResume.visibility = View.VISIBLE
+        }
+        binding.fbResume.setOnClickListener {
+            binding.fbResume.visibility = View.GONE
+            isMapTouched = false
+        }
         mGoogleMap.setOnMapLongClickListener {
             latLndBackgroundPermission = it
             if (Build.VERSION.SDK_INT >= 29) {
@@ -146,6 +160,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
             } else {
                 tryAddingGeofence(it)
             }
+        }
+    }
+
+    override fun onCameraMoveStarted(p0: Int) {
+        //When user change camera position
+        if (p0 == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
+            isMapTouched = true
+            binding.fbResume.visibility = View.VISIBLE
         }
     }
 
@@ -166,18 +188,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
     // Method to update the map with location
     private fun updateMapWithLocation() {
-        location?.latLng?.let {
-            val locationC = LatLng(it.latitude, it.longitude)
-            val cameraPosition = CameraPosition.Builder()
-                .target(locationC)
-                .zoom(16f)
-                .build()
+        if (!isMapTouched) {
+            location?.latLng?.let {
+                val locationC = LatLng(it.latitude, it.longitude)
+                val cameraPosition = CameraPosition.Builder()
+                    .target(locationC)
+                    .zoom(16f)
+                    .build()
 
-            mGoogleMap.animateCamera(
-                CameraUpdateFactory.newCameraPosition(
-                    cameraPosition
+                mGoogleMap.animateCamera(
+                    CameraUpdateFactory.newCameraPosition(
+                        cameraPosition
+                    )
                 )
-            )
+            }
         }
     }
 

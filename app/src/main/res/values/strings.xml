@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">GeofencingDemo</string>
     <string name="image_menu">ImageMenu</string>
+    <string name="Resume">Resume</string>
 
 
 </resources>
