@@ -6,9 +6,7 @@ import android.app.Service
 import android.content.Intent
 import android.location.Location
 import android.os.IBinder
-import android.util.Log
 import com.example.geofencingdemo.MainActivity
-import com.example.geofencingdemo.helper.retrieveAndDrawPolyline
 import com.example.geofencingdemo.helper.storeLocation
 import com.example.geofencingdemo.model.LocationEvent
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -46,7 +44,6 @@ class LocationForegroundService : Service() {
         locationRequest =
             LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).setIntervalMillis(500)
                 .build()
-        Log.e("ServiceTAG", "onCreate: called service")
         // Initialize Firebase
         database = FirebaseDatabase.getInstance()
         locationRef = database.getReference("user_locations")
@@ -56,7 +53,6 @@ class LocationForegroundService : Service() {
                 super.onLocationResult(locationResult)
                 try {
                     location = locationResult.lastLocation!!
-                    Log.e("ServiceTAG", "onCreate->onLocationResult: called service")
 
                     onNewLocation(location)
                     storeLocation(location, locationRef)
