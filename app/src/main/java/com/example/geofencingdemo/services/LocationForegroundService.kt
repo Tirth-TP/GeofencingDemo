@@ -51,6 +51,8 @@ class LocationForegroundService : Service() {
         database = FirebaseDatabase.getInstance()
         locationRef = database.getReference("user_locations")
 
+        startForeground(NOTIFICATION_ID, getNotification())
+
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
                 super.onLocationResult(locationResult)
@@ -59,7 +61,7 @@ class LocationForegroundService : Service() {
 
                     // Calculate speed
                     val speedInMetersPerSecond = location.speed // Speed in m/s
-                    Log.e("TAG-speed", "onLocationResult: $speedInMetersPerSecond" )
+                    Log.e("TAG-speed", "onLocationResult: $speedInMetersPerSecond")
 
                     if (speedInMetersPerSecond > 0) {
                         isMoving = true
@@ -94,7 +96,6 @@ class LocationForegroundService : Service() {
                 speed = speed
             )
         )
-        startForeground(NOTIFICATION_ID, getNotification())
     }
 
     @SuppressLint("MissingPermission")

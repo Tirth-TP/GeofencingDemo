@@ -147,11 +147,15 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
 
         mGoogleMap.setOnMapClickListener {
             isMapTouched = true
-            binding.fbResume.visibility = View.VISIBLE
+            binding.iconImageView.visibility = View.VISIBLE
+            binding.txtSpeed.visibility = View.GONE
+            binding.txtKmH.visibility = View.GONE
         }
-        binding.fbResume.setOnClickListener {
-            binding.fbResume.visibility = View.VISIBLE
+        binding.clFab.setOnClickListener {
             isMapTouched = false
+            binding.iconImageView.visibility = View.GONE
+            binding.txtSpeed.visibility = View.VISIBLE
+            binding.txtKmH.visibility = View.VISIBLE
         }
         mGoogleMap.setOnMapLongClickListener {
             latLndBackgroundPermission = it
@@ -168,11 +172,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
         //When user change camera position
         if (p0 == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
             isMapTouched = true
-            binding.fbResume.visibility = View.VISIBLE
-
-            binding.fbResume.setIconResource(R.drawable.ic_navigation)
-            binding.fbResume.text = null
-            binding.fbResume.shrink()
+            binding.iconImageView.visibility = View.VISIBLE
+            binding.txtSpeed.visibility = View.GONE
+            binding.txtKmH.visibility = View.GONE
         }
     }
 
@@ -195,10 +197,14 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback,
     @SuppressLint("SetTextI18n")
     private fun updateMapWithLocation() {
         if (!isMapTouched) {
-            binding.fbResume.icon = null
-            binding.fbResume.text = locationEventCall?.speed.toString() + " km/h"
+            //binding.fbResume.icon = null
+            if (locationEventCall?.speed == 0)
+                binding.txtSpeed.text = "- -"
+            else
+                binding.txtSpeed.text = locationEventCall?.speed.toString()
 
-            binding.fbResume.extend()
+
+            //binding.fbResume.extend()
 
             locationEventCall?.latLng?.let {
                 val locationC = LatLng(it.latitude, it.longitude)

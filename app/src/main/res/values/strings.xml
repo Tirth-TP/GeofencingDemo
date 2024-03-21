@@ -3,5 +3,7 @@
     <string name="image_menu">ImageMenu</string>
     <string name="Resume">Resume</string>
     <string name="speed">%d km/h</string>
+    <string name="km_h">km/h</string>
+    <string name="isco_resume">isco_resume</string>
 
 </resources>
